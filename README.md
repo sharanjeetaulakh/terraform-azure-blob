@@ -1,37 +1,38 @@
-# Azure Blob Storage — Terraform
+# Azure Blob Storage Automation with Terraform
 
-[![Azure](https://img.shields.io/badge/Azure-Cloud%20Infrastructure-0078D4?logo=microsoftazure&logoColor=white)](https://www.google.com/search?q=Microsoft+Azure+Cloud+Infrastructure)  [![Terraform](https://img.shields.io/badge/Terraform-Infrastructure%20as%20Code-7B42BC?logo=terraform&logoColor=white)](https://www.google.com/search?q=Terraform+Infrastructure+as+Code)  [![GitHub](https://img.shields.io/badge/Version%20Control-GitHub-181717?logo=github&logoColor=white)](https://www.google.com/search?q=GitHub+Version+Control)
+[![Azure](https://img.shields.io/badge/Azure-Cloud%20Infrastructure-0078D4?logo=microsoftazure&logoColor=white)](https://www.google.com/search?q=Microsoft+Azure+Cloud+Infrastructure) [![Terraform](https://img.shields.io/badge/Terraform-Infrastructure%20as%20Code-7B42BC?logo=terraform&logoColor=white)](https://www.google.com/search?q=Terraform+Infrastructure+as+Code) [![GitHub](https://img.shields.io/badge/Version%20Control-GitHub-181717?logo=github&logoColor=white)](https://www.google.com/search?q=GitHub+Version+Control)
 
 ## 📌 Project Overview
 
-This repository contains Terraform configuration for managing Azure Blob Storage using Infrastructure as Code (IaC).
+This repository demonstrates how to manage Azure Blob Storage using Terraform and Infrastructure as Code (IaC).
 
-The configuration uses Terraform data sources to reference an existing Azure Storage Account and Storage Container. It uses `for_each` to support multiple blob configurations.
+It uses Terraform data sources to retrieve an existing Azure Storage Account and Storage Container, then references those resources in the blob configuration. The `for_each` meta-argument supports multiple blob configurations through a map variable.
 
-This repository is part of a modular Azure infrastructure project for a Loan Management System.
+This project is part of a modular Azure infrastructure setup for a Loan Management System.
 
 ## 🏗️ Architecture
 
-The project separates Azure infrastructure into individual Terraform repositories:
+```mermaid
+flowchart TD
+    A["Terraform Configuration"] --> B["var.blobs"]
+    B --> C["Storage Account Data Source"]
+    C --> D["Storage Container Data Source"]
+    D --> E["Azure Blob Resource"]
+    E --> F["Blob Stored in Azure"]
+```
 
-- Resource Group
-- Storage Account
-- Storage Container
-- Blob Storage
-
-The Blob Storage configuration references existing Azure resources rather than creating the Storage Account or Container again.
-
-## ☁️ Azure Configuration
+## ☁️ Azure Resource Details
 
 | Property | Value |
 |---|---|
 | Cloud Provider | Microsoft Azure |
-| Infrastructure as Code | Terraform |
+| IaC Tool | Terraform |
 | Storage Account | `stlmsidndev001` |
 | Container | `loan-documents` |
 | Example Blob | `loan-application-sample.pdf` |
+| Container Access | Private |
 
-*Verify these resource names against your current Terraform configuration.*
+*Verify these values against your current Terraform configuration and Azure Portal.*
 
 ## 📂 Repository Structure
 
@@ -45,13 +46,11 @@ terraform-azure-blob/
 └── README.md
 ```
 
-*Adjust the structure if your repository contains different files.*
-
 ## ⚙️ Terraform Configuration
 
 ### 1. Storage Account Data Source
 
-This data source retrieves information about an existing Azure Storage Account.
+Retrieves information about an existing Azure Storage Account.
 
 ```hcl
 data "azurerm_storage_account" "storage_account" {
@@ -62,14 +61,9 @@ data "azurerm_storage_account" "storage_account" {
 }
 ```
 
-**Purpose:**
-- References an existing Storage Account.
-- Uses `for_each` to process the blob configuration map.
-- Retrieves the Storage Account ID for the related container lookup.
-
 ### 2. Storage Container Data Source
 
-This data source retrieves an existing Azure Storage Container using the corresponding Storage Account ID.
+Retrieves the existing container by referencing the matching Storage Account ID.
 
 ```hcl
 data "azurerm_storage_container" "container" {
@@ -80,52 +74,75 @@ data "azurerm_storage_container" "container" {
 }
 ```
 
-**Purpose:**
-- References an existing container.
-- Uses `each.key` to match the corresponding Storage Account.
-- Avoids creating a duplicate container.
+### 3. Azure Blob Resource
 
-### 3. Blob Management
+The following is an illustrative example of a block blob resource. Match the attribute names with your actual `variables.tf` and `terraform.tfvars`.
 
-The data sources above look up existing Azure resources. The blob resource configuration is responsible for managing or uploading the blob.
+```hcl
+resource "azurerm_storage_blob" "blob" {
+  for_each = var.blobs
 
-The exact blob resource arguments depend on the `azurerm_storage_blob` configuration in `main.tf`.
+  name                   = each.value.blob_name
+  storage_account_name   = data.azurerm_storage_account.storage_account[each.key].name
+  storage_container_name = data.azurerm_storage_container.container[each.key].name
+  type                   = "Block"
+  source                 = each.value.source
+}
+```
+
+**Key properties:**
+
+- `for_each` — manages multiple blob configurations.
+- `name` — sets the blob name in Azure Storage.
+- `storage_account_name` — references the existing Storage Account.
+- `storage_container_name` — references the existing container.
+- `type` — specifies a block blob.
+- `source` — identifies the local file to upload.
 
 ## 🔄 How It Works
 
-1. Terraform reads the configuration from `var.blobs`.
+1. Terraform reads the blob configuration from `var.blobs`.
 2. The Storage Account data source looks up the existing account.
-3. The Storage Container data source looks up the matching container.
-4. The blob resource uses the relevant storage details to manage the file.
-5. Terraform compares the configuration with its state and plans the required changes.
+3. The Storage Container data source looks up the existing container.
+4. The blob resource references those existing resources.
+5. Terraform plans and applies the requested blob changes.
 
-## 🚀 Deployment Steps
+## 🚀 Deployment Guide
 
-### Step 1: Login to Azure
+### Prerequisites
+
+- An Azure subscription
+- Terraform installed
+- Azure CLI installed
+- Appropriate Azure permissions
+- The referenced Storage Account and Container already exist
+- The local file specified by `source` exists
+
+### Step 1 — Login to Azure
 
 ```powershell
 az login
 ```
 
-### Step 2: Initialize Terraform
+### Step 2 — Initialize Terraform
 
 ```powershell
 terraform init
 ```
 
-### Step 3: Validate Configuration
+### Step 3 — Validate Configuration
 
 ```powershell
 terraform validate
 ```
 
-### Step 4: Review the Execution Plan
+### Step 4 — Review the Plan
 
 ```powershell
 terraform plan
 ```
 
-### Step 5: Apply Configuration
+### Step 5 — Apply Configuration
 
 ```powershell
 terraform apply
@@ -140,32 +157,32 @@ Review the proposed changes and approve the plan when prompted.
 3. Open the configured Storage Account.
 4. Select **Data storage → Containers**.
 5. Open the configured container.
-6. Verify that the expected blob is present.
+6. Verify that the expected blob has been uploaded.
 
-## 🔐 Best Practices
+## 🔐 Security & Best Practices
 
-- Use data sources to reference existing Azure resources.
-- Use `for_each` for reusable configuration.
-- Keep Storage Account and container names consistent with the variable map.
-- Never commit credentials or secrets to GitHub.
+- Keep containers private unless public access is required.
+- Use Azure RBAC and least-privilege permissions.
+- Never commit secrets, credentials, or storage access keys to GitHub.
+- Use variables to keep configuration reusable.
 - Review `terraform plan` before applying changes.
-- Use appropriate Azure permissions.
-- Configure a remote backend when shared Terraform state is required.
+- Ensure local source file paths are correct.
+- Configure remote Terraform state when shared state is required.
 
 ## 🎯 Key Learnings
 
 - Azure Blob Storage management using Terraform.
-- Referencing existing Storage Accounts and Containers through data sources.
-- Using `for_each` with a map variable.
-- Connecting Terraform resources through resource IDs.
-- Organizing Azure infrastructure into separate repositories.
+- Referencing existing Azure resources with data sources.
+- Using `for_each` with map variables.
+- Connecting resources through Terraform references.
+- Managing infrastructure with reusable IaC configuration.
 
 ## 👩‍💻 Author
 
 **Sharanjeet Kaur**
 
-Azure | Terraform | Azure DevOps | Infrastructure as Code
+Azure Cloud | Terraform | Azure DevOps | Infrastructure as Code
 
 ## 🏷️ Tags
 
-`Azure` `Terraform` `Blob Storage` `Data Sources` `for_each` `IaC` `DevOps` `Automation`
+`Azure` `Terraform` `Blob Storage` `Block Blob` `Data Sources` `for_each` `DevOps` `IaC`
